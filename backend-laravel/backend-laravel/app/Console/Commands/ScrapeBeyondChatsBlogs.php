@@ -4,9 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use GuzzleHttp\Client;
-use Symfony\Component\DomCrawler\Crawler;
 use App\Models\Article;
-use Illuminate\Support\Str;
 
 class ScrapeBeyondChatsBlogs extends Command
 {
@@ -15,79 +13,41 @@ class ScrapeBeyondChatsBlogs extends Command
 
     public function handle()
     {
-        $client = new Client([
-            'base_uri' => 'https://beyondchats.com',
-            'timeout'  => 10,
-        ]);
+        $client = new Client();
 
-        // 1. Find last page (you’ll need to inspect pagination HTML in browser and update selectors)
-        $listUrl = '/blogs/';
-        $res = $client->get($listUrl);
-        $html = (string) $res->getBody();
-        $crawler = new Crawler($html);
+        // Step 1: Get first page just to detect last page count
+        $response = $client->get('https://beyondchats.com/wp-json/wp/v2/posts?per_page=10&orderby=date');
+        
+        $lastPage = $response->getHeader('X-WP-TotalPages')[0] ?? 1;
 
-        // Example: assume there is a pagination with links and last page is the max page number
-        $pages = $crawler->filter('.pagination a')->each(function (Crawler $node) {
-            return $node->text();
-        });
+        $this->info("Detected Last Page: $lastPage");
 
-        $lastPage = collect($pages)
-            ->filter(fn($t) => is_numeric($t))
-            ->max() ?? 1;
+        // Step 2: Fetch last page (oldest posts live here)
+        $lastPageResponse = $client->get("https://beyondchats.com/wp-json/wp/v2/posts?per_page=10&page={$lastPage}&orderby=date&order=asc");
 
-        $this->info("Detected last page: {$lastPage}");
+        $posts = json_decode($lastPageResponse->getBody(), true);
 
-        // 2. Fetch last page
-        $resLast = $client->get("/blogs?page={$lastPage}");
-        $htmlLast = (string) $resLast->getBody();
-        $crawlerLast = new Crawler($htmlLast);
+        // Step 3: Take first 5 oldest
+        $posts = array_slice($posts, 0, 5);
 
-        // Update selectors after inspecting BeyondChats HTML
-        $articles = $crawlerLast->filter('.blog-card')->each(function (Crawler $node) {
-            $title = $node->filter('h2')->text('');
-            $url = $node->filter('a')->attr('href');
-            $excerpt = $node->filter('.excerpt')->count()
-                ? $node->filter('.excerpt')->text('')
-                : null;
+        foreach ($posts as $post) {
 
-            return compact('title', 'url', 'excerpt');
-        });
-
-        $articles = array_slice($articles, 0, (int) $this->option('limit'));
-
-        foreach ($articles as $data) {
-            if (!$data['title'] || !$data['url']) {
-                continue;
-            }
-
-            $fullUrl = Str::startsWith($data['url'], 'http')
-                ? $data['url']
-                : 'https://beyondchats.com' . $data['url'];
-
-            // Scrape detail page for main content (update selectors accordingly)
-            $resDetail = $client->get($fullUrl);
-            $detailHtml = (string) $resDetail->getBody();
-            $detailCrawler = new Crawler($detailHtml);
-
-            $contentNode = $detailCrawler->filter('.blog-content'); // adjust class
-            $contentHtml = $contentNode->count() ? $contentNode->html() : null;
-
-            $slug = Str::slug($data['title']);
-
-            $article = Article::updateOrCreate(
-                ['slug' => $slug],
+            Article::updateOrCreate(
+                ['slug' => $post['slug']],
                 [
-                    'title' => $data['title'],
-                    'excerpt' => $data['excerpt'] ?? null,
-                    'content' => $contentHtml,
-                    'source_url' => $fullUrl,
+                    'title' => $post['title']['rendered'],
+                    'excerpt' => $post['excerpt']['rendered'] ?? null,
+                    'content' => $post['content']['rendered'] ?? null,
+                    'source_url' => $post['link'],
                     'is_generated' => false,
                     'original_article_id' => null,
                 ]
             );
 
-            $this->info("Saved article: {$article->title}");
+            $this->info("Saved: " . $post['title']['rendered']);
         }
+
+        $this->info("Completed Successfully 🎉");
 
         return Command::SUCCESS;
     }
