@@ -1,91 +1,153 @@
 require('dotenv').config();
 const axios = require('axios');
 const cheerio = require('cheerio');
-const googleIt = require('google-it');
+const he = require('he');
+const { getJson } = require("serpapi");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 const BASE_URL = process.env.LARAVEL_BASE_URL || 'http://127.0.0.1:8000';
 
-// ---------------- 1️⃣ Fetch Latest Original Laravel Article ----------------
+// -------------------
+// Get Latest Article
+// -------------------
 async function getLatestArticle() {
   const res = await axios.get(`${BASE_URL}/api/articles-latest`);
   return res.data;
 }
 
-// ---------------- 2️⃣ Google Search for Similar Blogs ----------------
+// -------------------
+// Google Search via SerpAPI
+// -------------------
 async function searchGoogleBlogs(query) {
-  const results = await googleIt({ query, limit: 8 });
+  console.log("Searching with SerpAPI:", query);
 
-  const blogs = results.filter(r =>
-    r.link.includes('/blog') ||
-    r.link.includes('/article') ||
-    r.link.includes('medium.com') ||
-    r.link.includes('wordpress') ||
-    r.link.includes('substack.com')
-  ).slice(0, 2);
+  const results = await getJson({
+    api_key: process.env.SERPAPI_KEY,
+    engine: "google",
+    q: query,
+    hl: "en",
+    num: 10
+  });
 
-  return blogs;
+  if (!results.organic_results) {
+    throw new Error("No Google results returned from SerpAPI");
+  }
+
+  const blogs = results.organic_results.filter(r =>
+    r.link?.includes("/blog") ||
+    r.link?.includes("/post") ||
+    r.link?.includes("/news") ||
+    r.link?.includes("/article") ||
+    r.link?.includes("medium.com") ||
+    r.link?.includes("wordpress") ||
+    r.link?.includes("substack.com")
+  );
+
+  console.log("Filtered blog results:", blogs.length);
+
+  if (blogs.length >= 2) return blogs.slice(0, 10);
+
+  console.log("Fallback: using top organic results");
+  return results.organic_results.slice(0, 10);
 }
 
-// ---------------- 3️⃣ Scrape Blog Content ----------------
+// -------------------
+// Scrape Content Safely
+// -------------------
 async function scrapeMainContent(url) {
-  const res = await axios.get(url, { timeout: 15000 });
-  const $ = cheerio.load(res.data);
+  try {
+    console.log("Scraping:", url);
 
-  let content =
-    $('article').text().trim() ||
-    $('main').text().trim() ||
-    $('.post-content').text().trim() ||
-    $('.entry-content').text().trim();
+    const res = await axios.get(url, {
+      timeout: 20000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+    });
 
-  content = content.replace(/\s+\n/g, '\n').replace(/\n{2,}/g, '\n\n');
-  return content.slice(0, 15000);
+    const html = res.data;
+
+    if (
+      html.includes("cf-error-details") ||
+      html.includes("Cloudflare") ||
+      html.includes("Attention Required")
+    ) {
+      throw new Error("Cloudflare blocked this site");
+    }
+
+    const $ = cheerio.load(html);
+
+    let content =
+      $("article").text().trim() ||
+      $("main").text().trim() ||
+      $(".post-content").text().trim() ||
+      $(".entry-content").text().trim();
+
+    content = content.replace(/\s+\n/g, "\n").replace(/\n{2,}/g, "\n\n");
+
+    if (!content || content.length < 200) {
+      throw new Error("Content too small / not found");
+    }
+
+    return content.slice(0, 15000);
+  } catch (err) {
+    console.log("SCRAPE FAILED for", url);
+    console.log("Reason:", err.message);
+    return null;
+  }
 }
 
-// ---------------- 4️⃣ Gemini — Rewrite Improved Article ----------------
-async function generateImprovedArticle(original, ref1, ref2, urls) {
+// -------------------
+// Gemini Generation
+// -------------------
+async function generateImprovedArticle(original, ref1, ref2, refUrls) {
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro"
+    model: "gemini-2.5-flash",
   });
 
   const prompt = `
-You are an SEO expert and professional content writer.
+You are an SEO expert and professional copywriter.
 
-Original Article Title:
-${original.title}
+Original Title: ${original.title}
 
-Original Article Content:
+Original Content:
 ${original.content || ''}
 
-Reference Article 1 (Style Only):
+Reference Article 1 (style only, do not copy):
 ${ref1.slice(0, 6000)}
 
-Reference Article 2 (Style Only):
+Reference Article 2 (style only, do not copy):
 ${ref2.slice(0, 6000)}
 
-TASK:
-1️⃣ Rewrite the original article.
-2️⃣ Improve structure, clarity, SEO, and readability.
-3️⃣ Use headings, bullet points, formatting.
-4️⃣ DO NOT copy text from reference articles, only follow style.
-5️⃣ Keep meaning same.
-6️⃣ At bottom add:
+Rewrite task:
+- Rewrite original article
+- Improve clarity
+- Improve SEO
+- Better headings
+- Better structure
+- DO NOT copy sentences from references
+- Keep original meaning
+- Use clean readable formatting (Markdown / HTML allowed)
 
+At end add:
 References:
-- ${urls[0]}
-- ${urls[1]}
+- ${refUrls[0]}
+- ${refUrls[1]}
 `;
 
   const result = await model.generateContent(prompt);
   return result.response.text();
 }
 
-// ---------------- 5️⃣ Publish Back to Laravel ----------------
+// -------------------
+// Publish to Laravel
+// -------------------
 async function publishGeneratedArticle(original, newContent, references) {
   const payload = {
-    title: original.title + ' (Updated)',
+    title: original.title + " (Updated)",
     excerpt: original.excerpt,
     content: newContent,
     is_generated: true,
@@ -97,35 +159,53 @@ async function publishGeneratedArticle(original, newContent, references) {
   return res.data;
 }
 
-// ---------------- 🚀 MAIN SCRIPT ----------------
+// -------------------
+// MAIN
+// -------------------
 async function main() {
   try {
-    console.log('Fetching latest original article...');
+    console.log("Fetching latest original article...");
     const latest = await getLatestArticle();
-    console.log(`Latest article: ${latest.title}`);
+    console.log("Latest article:", latest.title);
 
-    console.log('Searching Google...');
-    const googleResults = await searchGoogleBlogs(latest.title);
-    if (googleResults.length < 2) throw new Error('Not enough Google results');
+    console.log("Searching Google...");
+    const cleanTitle = he.decode(latest.title);
+    const googleResults = await searchGoogleBlogs(cleanTitle);
 
     const urls = googleResults.map(r => r.link);
-    console.log('Selected reference URLs:', urls);
+    console.log("Selected reference URLs:", urls);
 
-    console.log('Scraping reference article 1...');
-    const ref1 = await scrapeMainContent(urls[0]);
+    let refContents = [];
+    let pickedUrls = [];
 
-    console.log('Scraping reference article 2...');
-    const ref2 = await scrapeMainContent(urls[1]);
+    for (const url of urls) {
+      if (refContents.length === 2) break;
 
-    console.log('Generating improved article using Gemini...');
-    const improved = await generateImprovedArticle(latest, ref1, ref2, urls);
+      const content = await scrapeMainContent(url);
+      if (content) {
+        refContents.push(content);
+        pickedUrls.push(url);
+      }
+    }
 
-    console.log('Publishing generated article to Laravel...');
-    const created = await publishGeneratedArticle(latest, improved, urls);
+    if (refContents.length < 2) {
+      throw new Error("Could not scrape 2 valid reference articles");
+    }
 
-    console.log('DONE 🎉 Created article ID:', created.id);
+    console.log("Calling Gemini to generate improved article...");
+    const improvedContent = await generateImprovedArticle(
+      latest,
+      refContents[0],
+      refContents[1],
+      pickedUrls
+    );
+
+    console.log("Publishing generated article to Laravel...");
+    const created = await publishGeneratedArticle(latest, improvedContent, pickedUrls);
+
+    console.log("DONE 🎉 Created article id:", created.id);
   } catch (err) {
-    console.error('Error:', err.response?.data || err.message);
+    console.error("Error:", err.message);
     process.exit(1);
   }
 }
