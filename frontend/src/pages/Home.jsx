@@ -17,12 +17,21 @@ export default function Home() {
   async function loadArticles() {
     try {
       setLoading(true);
-      const res = await fetch(
-        `${API_BASE}/api/articles?page=${page}${filter}`
-      );
+
+      const url = `${API_BASE}/api/articles?page=${page}${
+        filter ? `&${filter}` : ""
+      }`;
+
+      const res = await fetch(url);
       const data = await res.json();
+
       setArticles(data.data);
-      setMeta(data);
+      setMeta({
+        current_page: data.current_page,
+        last_page: data.last_page,
+        next_page_url: data.next_page_url,
+        prev_page_url: data.prev_page_url,
+      });
     } catch (err) {
       console.log("Error loading articles", err);
       alert("Failed to load articles");
@@ -46,8 +55,10 @@ export default function Home() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-4">
-      <div className="flex justify-between items-center flex-wrap gap-3">
+    <div className="max-w-7xl mx-auto py-10 px-4">
+
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-3xl font-bold dark:text-white">
           BeyondChats Articles
         </h1>
@@ -55,40 +66,40 @@ export default function Home() {
         <button
           onClick={scrapeBlogs}
           disabled={loading}
-          className="px-5 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+          className="px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
         >
           Scrape Blogs
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mt-6">
+      <div className="flex gap-3 mt-6 flex-wrap">
         <button
           onClick={() => {
-            setPage(1);
             setFilter("");
+            setPage(1);
           }}
-          className="px-4 py-2 bg-indigo-600 text-white rounded"
+          className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
         >
           All
         </button>
 
         <button
           onClick={() => {
+            setFilter("is_generated=0");
             setPage(1);
-            setFilter("&is_generated=0");
           }}
-          className="px-4 py-2 bg-green-600 text-white rounded"
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
         >
           Originals
         </button>
 
         <button
           onClick={() => {
+            setFilter("is_generated=1");
             setPage(1);
-            setFilter("&is_generated=1");
           }}
-          className="px-4 py-2 bg-purple-600 text-white rounded"
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
         >
           AI Generated
         </button>
@@ -96,9 +107,11 @@ export default function Home() {
 
       {/* Articles */}
       {loading ? (
-        <p className="text-center text-white mt-8">Loading...</p>
+        <div className="text-center text-gray-400 mt-10 text-lg">
+          Loading...
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {articles?.map((a) => (
             <ArticleCard key={a.id} article={a} />
           ))}
@@ -107,25 +120,26 @@ export default function Home() {
 
       {/* Pagination */}
       {meta && (
-        <div className="flex gap-6 justify-center mt-10 items-center">
+        <div className="flex justify-center gap-6 items-center mt-12">
+
           <button
             disabled={!meta.prev_page_url || loading}
-            onClick={() => setPage(page - 1)}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50"
+            onClick={() => setPage((p) => p - 1)}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-40"
           >
-            Previous
+            ← Previous
           </button>
 
-          <span className="dark:text-white">
-            Page {meta.current_page} of {meta.last_page}
+          <span className="dark:text-white font-semibold">
+            Page {meta.current_page} / {meta.last_page}
           </span>
 
           <button
             disabled={!meta.next_page_url || loading}
-            onClick={() => setPage(page + 1)}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50"
+            onClick={() => setPage((p) => p + 1)}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-40"
           >
-            Next
+            Next →
           </button>
         </div>
       )}

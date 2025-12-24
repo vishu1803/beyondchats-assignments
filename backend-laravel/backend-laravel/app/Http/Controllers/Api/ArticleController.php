@@ -9,9 +9,19 @@ use Illuminate\Support\Str;
 
 class ArticleController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Article::with('generatedVersions')->orderByDesc('created_at')->paginate(10);
+        $query = Article::with('generatedVersions')
+            ->orderByDesc('created_at');
+
+        // 🔥 Optional filter support (works with frontend)
+        // /api/articles?is_generated=0 → only originals
+        // /api/articles?is_generated=1 → only AI generated
+        if ($request->has('is_generated')) {
+            $query->where('is_generated', $request->is_generated);
+        }
+
+        return $query->paginate(10);
     }
 
     public function store(Request $request)
