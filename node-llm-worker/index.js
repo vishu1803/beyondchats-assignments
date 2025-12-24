@@ -8,10 +8,23 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const BASE_URL = process.env.LARAVEL_BASE_URL || 'http://127.0.0.1:8000';
 
+// ===============================
+// READ ARTICLE ID FROM CLI
+// node index.js 5
+// ===============================
+const passedArticleId = process.argv[2] || null;
+
 // -------------------
-// Get Latest Article
+// Get Article (ID or Latest)
 // -------------------
-async function getLatestArticle() {
+async function getArticle() {
+  if (passedArticleId) {
+    console.log(`Fetching article by ID: ${passedArticleId}`);
+    const res = await axios.get(`${BASE_URL}/api/articles/${passedArticleId}`);
+    return res.data;
+  }
+
+  console.log("Fetching latest original article...");
   const res = await axios.get(`${BASE_URL}/api/articles-latest`);
   return res.data;
 }
@@ -84,7 +97,8 @@ async function scrapeMainContent(url) {
       $("article").text().trim() ||
       $("main").text().trim() ||
       $(".post-content").text().trim() ||
-      $(".entry-content").text().trim();
+      $(".entry-content").text().trim() ||
+      $("body").text().trim();
 
     content = content.replace(/\s+\n/g, "\n").replace(/\n{2,}/g, "\n\n");
 
@@ -130,7 +144,7 @@ Rewrite task:
 - Better structure
 - DO NOT copy sentences from references
 - Keep original meaning
-- Use clean readable formatting (Markdown / HTML allowed)
+- Use clean readable formatting
 
 At end add:
 References:
@@ -164,9 +178,8 @@ async function publishGeneratedArticle(original, newContent, references) {
 // -------------------
 async function main() {
   try {
-    console.log("Fetching latest original article...");
-    const latest = await getLatestArticle();
-    console.log("Latest article:", latest.title);
+    const latest = await getArticle();
+    console.log("Using Article:", latest.title);
 
     console.log("Searching Google...");
     const cleanTitle = he.decode(latest.title);
