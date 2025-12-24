@@ -44,6 +44,7 @@ export default function Home() {
     try {
       setLoading(true);
       await fetch(`${API_BASE}/api/scrape`, { method: "POST" });
+
       alert("Scraping Completed 🎉 Refreshing...");
       setPage(1);
       loadArticles();
@@ -66,7 +67,9 @@ export default function Home() {
         <button
           onClick={scrapeBlogs}
           disabled={loading}
-          className="px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          className="px-5 py-3 bg-green-600 text-white rounded-lg 
+          hover:bg-green-700 disabled:opacity-50 
+          cursor-pointer disabled:cursor-not-allowed"
         >
           Scrape Blogs
         </button>
@@ -79,7 +82,8 @@ export default function Home() {
             setFilter("");
             setPage(1);
           }}
-          className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+          className="px-4 py-2 bg-gray-700 text-white rounded-lg 
+          hover:bg-gray-600 cursor-pointer"
         >
           All
         </button>
@@ -89,7 +93,8 @@ export default function Home() {
             setFilter("is_generated=0");
             setPage(1);
           }}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          className="px-4 py-2 bg-green-600 text-white rounded-lg 
+          hover:bg-green-700 cursor-pointer"
         >
           Originals
         </button>
@@ -99,7 +104,8 @@ export default function Home() {
             setFilter("is_generated=1");
             setPage(1);
           }}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg 
+          hover:bg-purple-700 cursor-pointer"
         >
           AI Generated
         </button>
@@ -125,7 +131,9 @@ export default function Home() {
           <button
             disabled={!meta.prev_page_url || loading}
             onClick={() => setPage((p) => p - 1)}
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-40"
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg 
+            disabled:opacity-40 
+            cursor-pointer disabled:cursor-not-allowed"
           >
             ← Previous
           </button>
@@ -137,10 +145,13 @@ export default function Home() {
           <button
             disabled={!meta.next_page_url || loading}
             onClick={() => setPage((p) => p + 1)}
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-40"
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg 
+            disabled:opacity-40 
+            cursor-pointer disabled:cursor-not-allowed"
           >
             Next →
           </button>
+
         </div>
       )}
     </div>
