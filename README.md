@@ -49,7 +49,7 @@ React Frontend UI Displays
 We reverse-engineered BeyondChats and identified their official WordPress REST API:
 
 [https://beyondchats.com/wp-json/wp/v2/posts?per_page=10\&orderby=date](https://beyondchats.com/wp-json/wp/v2/posts?per_page=10&orderby=date)
-```
+
 From here, we extract:
 
 
@@ -61,7 +61,7 @@ From here, we extract:
 | link | Original Article URL |
 
 Saved into DB as Original Article (is_generated = false)
-```
+
 🔹 Step 2 — Trigger AI Generation
 
 Frontend provides a button:
@@ -421,7 +421,7 @@ This delivers automated SEO improvement, readability upgrades, and content enric
 
 ## 🏗️ High‑Level Architecture
 
-
+```
 
 BeyondChats WordPress API
 ↓
@@ -780,5 +780,9 @@ A production‑ready AI automation system that:
 - Is fully deployable in real‑world scenarios  
 ```
 
+<span style="display:none">[^1]</span>
 
+<div align="center">⁂</div>
+
+[^1]: https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/84302193/85e1b674-d9fc-407d-b45c-4554fb2e4a73/Technical-Product-Manager-Assignment.pdf
 
