@@ -421,7 +421,7 @@ This delivers automated SEO improvement, readability upgrades, and content enric
 
 ## 🏗️ High‑Level Architecture
 
-```
+
 
 BeyondChats WordPress API
 ↓
