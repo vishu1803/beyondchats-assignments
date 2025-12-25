@@ -20,6 +20,13 @@ COPY . .
 
 RUN composer install --no-dev --optimize-autoloader
 
-RUN php artisan config:cache
+# Storage + Cache permissions
+RUN chmod -R 777 storage bootstrap/cache
 
-CMD php artisan serve --host=0.0.0.0 --port=10000
+# Clear & Cache config (safe)
+RUN php artisan config:clear
+RUN php artisan route:clear
+RUN php artisan view:clear
+
+# 🚀 IMPORTANT: Run migrations automatically then start server
+CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=10000
