@@ -1,46 +1,88 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { exec } = require("child_process");
+const winston = require("winston");
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("Generator Server Running");
+// ================= LOGGING =================
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [new winston.transports.Console()],
 });
 
-// Generate Route
+// ================= QUEUE =================
+let queue = [];
+let running = false;
+
+function runQueue() {
+  if (running || queue.length === 0) return;
+
+  running = true;
+  const job = queue.shift();
+
+  logger.info("🧠 Processing LLM Job", { articleId: job.articleId });
+
+  exec(job.command, { timeout: 300000 }, (err, stdout, stderr) => {
+    running = false;
+
+    if (err) {
+      logger.error("❌ LLM FAILED", { stderr });
+
+      try {
+        job.res.status(500).json({
+          success: false,
+          message: "Generation Failed",
+          error: stderr,
+        });
+      } catch (_) {}
+    } else {
+      logger.info("✅ LLM SUCCESS");
+
+      try {
+        job.res.json({
+          success: true,
+          message: "Article Generated Successfully",
+          output: stdout,
+        });
+      } catch (_) {}
+    }
+
+    runQueue();
+  });
+}
+
+// ================= HEALTH CHECK =================
+app.get("/", (req, res) => {
+  res.send("Generator Server Running 🚀");
+});
+
+// ================= GENERATE =================
 app.post("/generate", (req, res) => {
   const articleId = req.body?.id || null;
 
-  console.log("🚀 LLM Generation Triggered");
-  console.log("Article ID:", articleId ?? "LATEST ARTICLE");
+  logger.info("⚡ Generation Requested", {
+    articleId: articleId ?? "LATEST ARTICLE",
+  });
 
-  // If ID is provided → pass it, else fallback to latest
   const cmd = articleId ? `node index.js ${articleId}` : "node index.js";
 
-  exec(cmd, { timeout: 300000 }, (err, stdout, stderr) => {
-    if (err) {
-      console.error("❌ LLM Failed", stderr);
-      return res.status(500).json({
-        success: false,
-        message: "Generation Failed",
-        error: stderr,
-      });
-    }
-
-    console.log("✅ LLM Success");
-    console.log(stdout);
-
-    res.json({
-      success: true,
-      message: "Article Generated Successfully",
-      output: stdout,
-    });
+  queue.push({
+    articleId,
+    command: cmd,
+    res,
   });
+
+  runQueue();
 });
 
-app.listen(5000, () => console.log("Generator API running on 5000"));
+// ================= START =================
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => logger.info(`🚀 Generator API running on ${PORT}`));
