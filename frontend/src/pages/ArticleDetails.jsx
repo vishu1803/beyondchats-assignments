@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export default function ArticleDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ export default function ArticleDetails() {
 
   async function fetchArticle() {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/articles/${id}`);
+      const res = await fetch(`${API_BASE}/api/articles/${id}`);
       const data = await res.json();
       setArticle(data);
     } catch (err) {
@@ -34,20 +36,22 @@ export default function ArticleDetails() {
     try {
       setGenerating(true);
 
-      const res = await fetch("http://127.0.0.1:5000/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_GENERATOR_API}/generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      );
 
       const data = await res.json();
-
       if (!data.success) throw new Error("LLM Failed");
 
       alert("AI Article Generated Successfully 🎯");
       fetchArticle();
     } catch (e) {
-      alert("Failed to generate. Make sure Node server is running on 5000.");
+      alert("Failed to generate. Make sure Node server is running.");
       console.error(e);
     } finally {
       setGenerating(false);
@@ -62,21 +66,23 @@ export default function ArticleDetails() {
     );
 
   if (!article)
-    return <div className="text-center text-red-500 mt-10">Article not found</div>;
+    return (
+      <div className="text-center text-red-500 mt-10">
+        Article not found
+      </div>
+    );
 
   const isGenerated = article.is_generated;
-
   const cleanAIContent = (text = "") =>
     text.replace(/References[\s\S]*$/i, "").trim();
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-
       {/* Back Button */}
       <button
         onClick={() => navigate(-1)}
         className="px-4 py-2 rounded-lg bg-gray-800 text-white 
-        hover:bg-gray-700 transition mb-4 cursor-pointer"
+          hover:bg-gray-700 transition mb-4 cursor-pointer"
       >
         ← Back
       </button>
@@ -111,8 +117,8 @@ export default function ArticleDetails() {
               onClick={triggerLLM}
               disabled={generating}
               className="mt-4 px-5 py-2 bg-purple-600 text-white rounded 
-              hover:bg-purple-700 disabled:bg-gray-400 
-              cursor-pointer disabled:cursor-not-allowed"
+                hover:bg-purple-700 disabled:bg-gray-400 
+                cursor-pointer disabled:cursor-not-allowed"
             >
               {generating ? "Generating..." : "⚡ Generate AI Version"}
             </button>
@@ -143,7 +149,7 @@ export default function ArticleDetails() {
                     <button
                       onClick={() => navigate(`/article/${g.id}`)}
                       className="mt-3 px-4 py-2 text-sm bg-blue-600 text-white 
-                      rounded hover:bg-blue-700 cursor-pointer"
+                        rounded hover:bg-blue-700 cursor-pointer"
                     >
                       View AI Generated Article →
                     </button>
@@ -170,7 +176,7 @@ export default function ArticleDetails() {
             <button
               onClick={() => navigate(`/article/${article.original.id}`)}
               className="mt-4 px-4 py-2 bg-green-600 text-white rounded 
-              hover:bg-green-700 cursor-pointer"
+                hover:bg-green-700 cursor-pointer"
             >
               View Original Article →
             </button>
@@ -193,7 +199,9 @@ export default function ArticleDetails() {
           {/* References */}
           {article.references?.length > 0 && (
             <div className="mt-6">
-              <h3 className="font-bold dark:text-white">Reference Sources</h3>
+              <h3 className="font-bold dark:text-white">
+                Reference Sources
+              </h3>
               <ul className="list-disc pl-6">
                 {article.references.map((r, idx) => (
                   <li key={idx}>
