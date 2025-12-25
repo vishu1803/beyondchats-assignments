@@ -1,5 +1,5 @@
 
-🚀 BeyondChats AI Article Enhancement Platform
+# 🚀 BeyondChats AI Article Enhancement Platform
 
 — Scrape → Analyze → Enhance → Publish
 
@@ -23,6 +23,7 @@ It fetches real BeyondChats posts, then:
 6️⃣ Frontend displays both versions in a clean UI
 
 This provides measurable SEO enhancement, readability improvement, and content enrichment — completely automated.
+```
 
 🏗️ High Level Architecture
 BeyondChats WordPress API
@@ -40,6 +41,7 @@ Saves Generated Article
 React Frontend UI Displays
  ├─ Original Article
  └─ AI Generated Improved Article
+```
 
 🧵 Detailed Data Flow
 🔹 Step 1 — Get Real BeyondChats Articles
@@ -47,7 +49,7 @@ React Frontend UI Displays
 We reverse-engineered BeyondChats and identified their official WordPress REST API:
 
 [https://beyondchats.com/wp-json/wp/v2/posts?per_page=10\&orderby=date](https://beyondchats.com/wp-json/wp/v2/posts?per_page=10&orderby=date)
-
+```
 From here, we extract:
 
 
@@ -59,7 +61,7 @@ From here, we extract:
 | link | Original Article URL |
 
 Saved into DB as Original Article (is_generated = false)
-
+```
 🔹 Step 2 — Trigger AI Generation
 
 Frontend provides a button:
